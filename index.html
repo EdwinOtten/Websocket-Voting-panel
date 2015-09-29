@@ -1,0 +1,278 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Vakantiehuisje panel</title>
+    <style>
+      body {
+          padding: 0;
+          margin: 0;
+          text-align: center;
+          font-family:"Lucida Sans Unicode", "Lucida Grande", sans-serif;
+          font-size: 0.8em;
+          overflow-y: scroll;
+      }
+      // Initial state 
+      #user-screen {
+          display: block;
+      }
+      #main {
+          display: none;
+          opacity: 0;
+      }
+      h1 {
+          background: pink;
+          margin-top: 0;
+          line-height: 2.4em;
+          color: white;
+          background: #3EB96A;
+      }
+      #user-screen ul {
+          list-style-type: none;
+          margin: 0;
+          padding: 0;
+      }
+      #user-screen ul li {
+          padding: 16px;
+          font-size: 1.4em;
+          border-bottom: 1px solid #EEE;
+          cursor: pointer;
+      }
+      #user-screen ul li:last-child {
+          border: none;
+      }
+      button {
+          padding: 2px 2px 2px 4px;
+      }
+      #new-entry-form {
+          z-index: -1;
+          opacity: 0;
+          max-width: 290px;
+          width: 100%;
+          margin: 0 auto;
+      }
+      #save-entry {
+          margin-right: 5px;
+          float: right;
+      }
+      form {
+          margin-top: 1em;
+      }
+      form input {
+          margin-bottom: 4px;
+      }
+      label {
+          margin-top: 1px;
+          margin-bottom: 4px;
+          display: inline-block;
+          width: 100px;
+          text-align: right;
+          padding-right: 6px;
+          vertical-align: top;
+      }
+      .checkbox-set {
+          width: 100%;
+          text-align: right;
+      }
+      .checkbox-set label, .checkbox-set input {
+          width: auto;
+          display: inline-block;
+      }
+      input {
+          vertical-align: top;
+      }
+      #content {
+          position: absolute;
+          z-index: 99;
+          background-color: white;
+          width: 100%;
+          min-height: 500px;
+      }
+      #entries {
+          width: 100%;
+          max-width: 400px;
+          margin: 0 auto;
+      }
+      .entry {
+          width: 100%;
+          margin-top: 2em;
+          padding: 0.4em;
+      }
+      .entry th, .entry td {
+          text-align: left;
+          vertical-align: top;
+      }
+      .entry .sidebar {
+          text-align: right;
+          white-space: nowrap;
+      }
+      .entry .price {
+          font-weight: 600;
+      }
+      .entry .title {
+          font-size: 1.3em;
+      }
+      .entry .description {
+          margin: 0.3em 0em;
+      }
+      .entry .votes {
+          color: #26A726;
+      }
+      .vote-up {
+          background-color: #26A726;
+          color: white;
+          border: none;
+          border-radius: 3px;
+      }
+    </style>
+  </head>
+  <body>
+
+    <h1>Voting panel</h1>
+
+    <div id="user-screen">
+      <h2>I am..</h2>
+      <ul>
+      </ul>
+    </div>
+
+    <div id="main">
+        <button id="add-entry">Add a option &#10133;</button>
+        <br>
+        <br>
+        <form id="new-entry-form">
+            <label for="url">URL</label>
+            <input name="url" type="url" />
+            <br>
+            <label for="title">Title</label>
+            <input name="title" type="text" />
+            <br>
+            <label for="price">Price €</label>
+            <input name="price" type="number" />
+            <br>
+            <label for="description">Description</label>
+            <textarea name="description" placeholder="optional" cols="21" rows="5" style="margin-left: -1px;"></textarea>
+            <br>
+            <button id="save-entry">Opslaan</button>
+        </form>
+        <div id="content">
+            <div id="entries">
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.socket.io/socket.io-1.2.0.js"></script>
+    <script src="http://code.jquery.com/jquery-1.11.1.js"></script>
+    <script>
+      $.fn.serializeJSON=function() {
+          var json = {};
+          jQuery.map($(this).serializeArray(), function(n, i){
+              json[n['name']] = n['value'];
+          });
+          return json;
+      };
+
+      var socket = io();
+      $('#save-entry').click(function(){
+        var obj = $('#new-entry-form').serializeJSON();
+        console.log(obj);
+        socket.emit('add-entry', obj);
+        $("#add-entry").click();
+      });
+      socket.on('usernames', function(usernames){
+        $('#user-screen ul').html('');
+        for (i = 0; i < usernames.length; i++) {
+          $('#user-screen ul').append($('<li>').text(usernames[i]).data('username',usernames[i]));
+        }
+
+        $('#user-screen ul li').click(function () {
+            socket.emit('login', $(this).data('username'));
+            $('#main').css('display', 'block');
+            $('#main').stop().animate({
+                opacity: 1
+            }, 600);
+            $('#user-screen').stop().animate({
+                height: 0,
+                opacity: 0
+            }, 600);
+            formHeight = parseInt($('#new-entry-form').css('height'))+50;
+            $('#new-entry-form').css('height', 0);
+            $('#new-entry-form').css('opacity', 1);
+            setTimeout(function () {
+                $('#user-screen').css('display', 'none');
+            }, 650);
+
+        });
+      });
+
+      socket.on('entries', function(entries){
+        $('#entries').html('');
+        for (i = 0; i < entries.length; i++) {
+          var entry = entries[i];
+          var voters = '';
+          for (j = 0; j < entry.votes.length; j++) {
+            voters = voters+entry.votes[j]+', ';
+          }
+
+            $('#entries').append('<table class="entry" data-entry-id="'+entry.id+'">' +
+'    <tr>' +
+'        <th class="title" width="*" colspan="2">'+entry.title+'</th>' +
+'    </tr>' +
+'    <tr>' +
+'       <td class="description" rowspan="3" width="*">'+entry.description+'</td>' +
+'        <td class="price sidebar">€ '+entry.price+'</td>' +
+'    </tr>' +
+'    <tr>' +
+'        <td class="votes sidebar" title="'+voters+'">'+entry.votes.length+' votes</td>' +
+'    </tr>' +
+'    <tr>' +
+'        <td class="sidebar">' +
+'            <button class="vote-up">Vote &#128077</button>' +
+'        </td>' +
+'    </tr>' +
+'    <tr>' +
+'        <td colspan="2"><a href="'+entry.url+'" target="_blank">'+entry.url+'</a>' +
+'        </td>' +
+'    </tr>' +
+'</table>');
+
+        }
+
+        $('.vote-up').click(function () {
+            var entry = $(this).closest('.entry');
+            voteForEntryId(entry.data('entry-id'));
+        });
+
+      });
+
+
+      var formVisible = false;
+      var formHeight = 0;
+
+      $("#add-entry").click(function () {
+          if (formVisible) {
+              $('#new-entry-form').stop().animate({
+                  height: 0,
+                  opacity: 0
+              }, 350);
+          } else {
+              $('#new-entry-form').stop().animate({
+                  height: formHeight,
+                  opacity: 1
+              }, 350);
+          }
+          formVisible = !formVisible;
+      });
+
+
+
+      function voteForEntryId(id) {
+          var entryId = parseInt(id);
+          if (!isNaN(entryId)) {
+            socket.emit('vote', entryId);
+          }
+      }
+
+
+    </script>
+  </body>
+</html>
